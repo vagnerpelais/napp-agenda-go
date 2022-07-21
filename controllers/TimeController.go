@@ -91,3 +91,18 @@ func UpdateTime(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": time})
 }
+
+func DeleteTime(c *gin.Context) {
+	var time models.Time
+
+	db := database.GetDatabase()
+
+	if err := db.Where("id = ?", c.Param("id")).First(&time).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	db.Delete(&time)
+
+	c.JSON(http.StatusOK, gin.H{"data": true})
+}

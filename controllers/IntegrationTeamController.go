@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vagnerpelais/napp-agenda/database"
 	"github.com/vagnerpelais/napp-agenda/models"
+	"github.com/vagnerpelais/napp-agenda/repositories"
 )
 
 type CreateIntegrationTeamInput struct {
@@ -24,13 +25,11 @@ type UpdateIntegrationTeamInput struct {
 func GetIntegrationTeams(c *gin.Context) {
 	db := database.GetDatabase()
 
-	var integrationTeam []models.IntegrationTeam
-
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage := 2
 
-	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&integrationTeam).Error
-
+	repository := repositories.NewIntegrationTeamRepository(db)
+	integrationTeam, err := repository.GetIntegrationTeams(perPage, page)
 	if err != nil {
 		c.JSON(404, gin.H{
 			"error": "cannot find all teams: " + err.Error(),
@@ -42,11 +41,15 @@ func GetIntegrationTeams(c *gin.Context) {
 }
 
 func GetIntegrationTeamByID(c *gin.Context) {
-	var integrationTeam models.IntegrationTeam
-
 	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
 
-	if err := db.Where("id = ?", c.Param("id")).First(&integrationTeam).Error; err != nil {
+	repository := repositories.NewIntegrationTeamRepository(db)
+	integrationTeam, err := repository.GetIntegrationTeamByID(id)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -69,18 +72,17 @@ func CreateIntegrationTeam(c *gin.Context) {
 
 	db := database.GetDatabase()
 
-	db.Create(&integrationTeam)
+	repository := repositories.NewIntegrationTeamRepository(db)
+	newIntegrationTeam := repository.CreateIntegrationTeam(integrationTeam)
 
-	c.JSON(http.StatusOK, gin.H{"data": integrationTeam})
+	c.JSON(http.StatusOK, gin.H{"data": newIntegrationTeam})
 }
 
 func UpdateIntegrationTeam(c *gin.Context) {
-	var integrationTeam models.IntegrationTeam
 	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&integrationTeam).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
-		return
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
 	}
 
 	var input UpdateIntegrationTeamInput
@@ -89,13 +91,35 @@ func UpdateIntegrationTeam(c *gin.Context) {
 		return
 	}
 
-	updateStore := models.IntegrationTeam{
+	updateIntegrationTeam := models.IntegrationTeam{
 		Name:         input.Name,
 		Color:        input.Color,
 		LimitPerHour: input.LimitPerHour,
 	}
 
-	db.Model(&integrationTeam).Updates(updateStore)
+	repository := repositories.NewIntegrationTeamRepository(db)
+	newIntegrationTeam, err := repository.UpdateIntegrationTeam(id, updateIntegrationTeam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": newIntegrationTeam})
+}
+
+func DeleteIntegrationTeam(c *gin.Context) {
+	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
+
+	repository := repositories.NewIntegrationTeamRepository(db)
+	integrationTeam, err := repository.DeleteIntegrationTeam(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"data": integrationTeam})
 }

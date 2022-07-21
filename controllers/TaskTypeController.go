@@ -91,3 +91,18 @@ func UpdateTaskType(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": taskType})
 }
+
+func DeleteTaskType(c *gin.Context) {
+	var taskType models.TaskType
+
+	db := database.GetDatabase()
+
+	if err := db.Where("id = ?", c.Param("id")).First(&taskType).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	db.Delete(&taskType)
+
+	c.JSON(http.StatusOK, gin.H{"data": true})
+}

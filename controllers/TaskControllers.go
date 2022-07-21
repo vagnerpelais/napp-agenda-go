@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vagnerpelais/napp-agenda/database"
 	"github.com/vagnerpelais/napp-agenda/models"
+	"github.com/vagnerpelais/napp-agenda/services"
 	"gorm.io/gorm"
 )
 
@@ -73,23 +74,24 @@ type CreateTaskInput struct {
 	IntegrationTeamID ResponseIntegrationTeam `json:"integration_team" binding:"required"`
 }
 
-func formatTime(timestr string) (time.Time, error) {
-	if timestr != "" {
-		estLocation, err := time.LoadLocation("America/Sao_Paulo")
-		if err != nil {
-			return time.Time{}, nil
-		}
+func getTasksCount(teamid int64, timeid int64, date string) uint {
+	var count uint
 
-		layout := "2006-01-02"
+	db := database.GetDatabase()
 
-		t, erro := time.ParseInLocation(layout, timestr, estLocation)
-		if erro != nil {
-			return time.Time{}, erro
-		}
+	db.Raw("SELECT COUNT(*) FROM task WHERE integration_team_id = ? and time_id = ? and date = ?", teamid, timeid, date).Scan(&count)
 
-		return t, nil
-	}
-	return time.Time{}, nil
+	return count
+}
+
+func getIntegrationTeamLimit(id int64) uint {
+	var limit uint
+
+	db := database.GetDatabase()
+
+	db.Raw("SELECT limit_per_hour from integration_team where id = ?", id).Scan(&limit)
+
+	return limit
 }
 
 func GetTasks(c *gin.Context) {
@@ -133,16 +135,27 @@ func CreateTask(c *gin.Context) {
 		return
 	}
 
-	dateFormat, err := formatTime(input.Date)
-
+	dateString, dateFormat, err := services.FormatTime(input.Date)
 	if err != nil {
 		log.Fatalf("the date inputed is invalid: %s  error: %s", input.Date, err)
+	}
+
+	weekend := services.IsWeekend(dateFormat)
+	if weekend {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot schedule in weekends!"})
+		return
+	}
+
+	holiday := services.CheckHoliday(dateFormat)
+	if holiday {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot schedule in holidays!"})
+		return
 	}
 
 	task := models.Task{
 		Name:              input.Name,
 		Erp:               input.Erp,
-		Date:              dateFormat,
+		Date:              dateString,
 		Observations:      input.Observations,
 		StoreID:           input.StoreID.ID,
 		UserID:            input.UserID.ID,
@@ -152,6 +165,20 @@ func CreateTask(c *gin.Context) {
 	}
 
 	db := database.GetDatabase()
+
+	// var event []models.Events
+	// var count int64
+	// db.Find(&event, "ilike date = ?", dateFormat).Count(&count)
+
+	// log.Printf("%d", count)
+
+	counter := getTasksCount(int64(input.IntegrationTeamID.ID), int64(input.TimeID.ID), dateString)
+	limit := getIntegrationTeamLimit(int64(input.IntegrationTeamID.ID))
+
+	if counter >= limit {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Limit of schedules per hour exceeded!"})
+		return
+	}
 
 	db.Create(&task)
 
@@ -173,15 +200,29 @@ func UpdateTask(c *gin.Context) {
 		return
 	}
 
-	dateFormat, err := formatTime(input.Date)
+	dateString, dateFormat, err := services.FormatTime(input.Date)
 	if err != nil {
 		log.Fatalf("the date inputed is invalid: %s  error: %s", input.Date, err)
+	}
+
+	if (time.Time{}) != dateFormat {
+		weekend := services.IsWeekend(dateFormat)
+		if weekend {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot schedule in weekends!"})
+			return
+		}
+
+		holiday := services.CheckHoliday(dateFormat)
+		if holiday {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot schedule in holidays!"})
+			return
+		}
 	}
 
 	updateTask := models.Task{
 		Name:              input.Name,
 		Erp:               input.Erp,
-		Date:              dateFormat,
+		Date:              dateString,
 		Observations:      input.Observations,
 		StoreID:           input.StoreID,
 		UserID:            input.UserID,
@@ -193,4 +234,19 @@ func UpdateTask(c *gin.Context) {
 	db.Model(&task).Updates(updateTask)
 
 	c.JSON(http.StatusOK, gin.H{"data": task})
+}
+
+func DeleteTask(c *gin.Context) {
+	var task models.Task
+
+	db := database.GetDatabase()
+
+	if err := db.Where("id = ?", c.Param("id")).First(&task).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	db.Delete(&task)
+
+	c.JSON(http.StatusOK, gin.H{"data": true})
 }

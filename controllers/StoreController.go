@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vagnerpelais/napp-agenda/database"
 	"github.com/vagnerpelais/napp-agenda/models"
+	"github.com/vagnerpelais/napp-agenda/repositories"
 )
 
 type CreateStoreInput struct {
@@ -24,13 +25,11 @@ type UpdateStoreInput struct {
 func GetStores(c *gin.Context) {
 	db := database.GetDatabase()
 
-	var stores []models.Store
-
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage := 2
 
-	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&stores).Error
-
+	repository := repositories.NewStoreRepository(db)
+	store, err := repository.GetStores(perPage, page)
 	if err != nil {
 		c.JSON(404, gin.H{
 			"error": "cannot find all stores: " + err.Error(),
@@ -38,15 +37,19 @@ func GetStores(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"total": strconv.Itoa(len(stores)), "data": stores})
+	c.JSON(200, gin.H{"total": strconv.Itoa(len(store)), "data": store})
 }
 
 func GetStoreByID(c *gin.Context) {
-	var store models.Store
-
 	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
 
-	if err := db.Where("id = ?", c.Param("id")).First(&store).Error; err != nil {
+	repository := repositories.NewStoreRepository(db)
+	store, err := repository.GetStoreByID(id)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -69,18 +72,17 @@ func CreateStore(c *gin.Context) {
 
 	db := database.GetDatabase()
 
-	db.Create(&store)
+	repository := repositories.NewStoreRepository(db)
+	newStore := repository.CreateStore(store)
 
-	c.JSON(http.StatusOK, gin.H{"data": store})
+	c.JSON(http.StatusOK, gin.H{"data": newStore})
 }
 
 func UpdateStore(c *gin.Context) {
-	var store models.Store
 	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&store).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
-		return
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
 	}
 
 	var input UpdateStoreInput
@@ -95,7 +97,29 @@ func UpdateStore(c *gin.Context) {
 		LegalName: input.LegalName,
 	}
 
-	db.Model(&store).Updates(updateStore)
+	repository := repositories.NewStoreRepository(db)
+	newStore, err := repository.UpdateStore(id, updateStore)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": newStore})
+}
+
+func DeleteStore(c *gin.Context) {
+	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
+
+	repository := repositories.NewStoreRepository(db)
+	store, err := repository.DeleteStore(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"data": store})
 }

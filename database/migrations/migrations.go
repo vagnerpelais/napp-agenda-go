@@ -13,4 +13,5 @@ func RunMigrations(db *gorm.DB) {
 	db.AutoMigrate(models.TaskType{})
 	db.AutoMigrate(models.Time{})
 	db.AutoMigrate(models.User{})
+	db.AutoMigrate(models.Event{})
 }
