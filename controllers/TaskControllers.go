@@ -9,19 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vagnerpelais/napp-agenda/database"
 	"github.com/vagnerpelais/napp-agenda/models"
+	"gorm.io/gorm"
 )
-
-type CreateTaskInput struct {
-	Name              string `json:"name" binding:"required"`
-	Erp               string `json:"erp" binding:"required"`
-	Date              string `json:"date" binding:"required"`
-	Observations      string `json:"observations" binding:"required"`
-	StoreID           uint   `json:"store" binding:"required"`
-	UserID            uint   `json:"user" binding:"required"`
-	TaskTypeID        uint   `json:"task_type" binding:"required"`
-	TimeID            uint   `json:"time" binding:"required"`
-	IntegrationTeamID uint   `json:"integration_team" binding:"required"`
-}
 
 type UpdateTaskInput struct {
 	Name              string `json:"name"`
@@ -33,6 +22,55 @@ type UpdateTaskInput struct {
 	TaskTypeID        uint   `json:"task_type"`
 	TimeID            uint   `json:"time"`
 	IntegrationTeamID uint   `json:"integration_team"`
+}
+
+type ResponseIntegrationTeam struct {
+	gorm.Model
+	ID           uint   `json:"id"`
+	Name         string `json:"name"`
+	Color        string `json:"color"`
+	LimitPerHour uint   `json:"limit_per_hour"`
+}
+
+type ResponseStore struct {
+	gorm.Model
+	ID        uint   `json:"id"`
+	Name      string `json:"name"`
+	Cnpj      string `json:"cnpj"`
+	LegalName string `json:"legal_name"`
+}
+
+type ResponseTaskType struct {
+	gorm.Model
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
+
+type ResponseTime struct {
+	gorm.Model
+	ID   uint   `json:"id"`
+	Hour string `json:"hour"`
+}
+
+type ResponseUser struct {
+	gorm.Model
+	ID         uint   `json:"id"`
+	Email      string `json:"email"`
+	IsActive   bool   `json:"is_active"`
+	IsAdmin    bool   `json:"is_admin"`
+	IsTechLead bool   `json:"is_tech_lead"`
+}
+
+type CreateTaskInput struct {
+	Name              string                  `json:"name" binding:"required"`
+	Erp               string                  `json:"erp" binding:"required"`
+	Date              string                  `json:"date" binding:"required"`
+	Observations      string                  `json:"observations" binding:"required"`
+	StoreID           ResponseStore           `json:"store" binding:"required"`
+	UserID            ResponseUser            `json:"user" binding:"required"`
+	TaskTypeID        ResponseTaskType        `json:"task_type" binding:"required"`
+	TimeID            ResponseTime            `json:"time" binding:"required"`
+	IntegrationTeamID ResponseIntegrationTeam `json:"integration_team" binding:"required"`
 }
 
 func formatTime(timestr string) (time.Time, error) {
@@ -58,7 +96,12 @@ func GetTasks(c *gin.Context) {
 	db := database.GetDatabase()
 
 	var task []models.Task
-	err := db.Find(&task).Error
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage := 2
+
+	err := db.Limit(perPage).Offset((page - 1) * perPage).Preload("Store").Preload("User").
+		Preload("TaskType").Preload("Time").Preload("IntegrationTeam").Find(&task).Error
 
 	if err != nil {
 		c.JSON(404, gin.H{
@@ -72,10 +115,10 @@ func GetTasks(c *gin.Context) {
 
 func GetTaskByID(c *gin.Context) {
 	var task models.Task
-
 	db := database.GetDatabase()
 
-	if err := db.Where("id = ?", c.Param("id")).First(&task).Error; err != nil {
+	if err := db.Where("id = ?", c.Param("id")).Preload("Store").Preload("User").
+		Preload("TaskType").Preload("Time").Preload("IntegrationTeam").Find(&task).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -101,11 +144,11 @@ func CreateTask(c *gin.Context) {
 		Erp:               input.Erp,
 		Date:              dateFormat,
 		Observations:      input.Observations,
-		StoreID:           input.StoreID,
-		UserID:            input.UserID,
-		TaskTypeID:        input.TaskTypeID,
-		TimeID:            input.TimeID,
-		IntegrationTeamID: input.IntegrationTeamID,
+		StoreID:           input.StoreID.ID,
+		UserID:            input.UserID.ID,
+		TaskTypeID:        input.TaskTypeID.ID,
+		TimeID:            input.TimeID.ID,
+		IntegrationTeamID: input.IntegrationTeamID.ID,
 	}
 
 	db := database.GetDatabase()

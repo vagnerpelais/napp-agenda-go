@@ -25,7 +25,11 @@ func GetIntegrationTeams(c *gin.Context) {
 	db := database.GetDatabase()
 
 	var integrationTeam []models.IntegrationTeam
-	err := db.Find(&integrationTeam).Error
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage := 2
+
+	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&integrationTeam).Error
 
 	if err != nil {
 		c.JSON(404, gin.H{

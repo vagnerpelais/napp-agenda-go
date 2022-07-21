@@ -54,17 +54,22 @@ type TaskType struct {
 }
 
 type Task struct {
-	ID                uint           `json:"id" gorm:"primaryKey"`
-	Name              string         `json:"name"`
-	Erp               string         `json:"erp"`
-	Date              time.Time      `json:"date"`
-	Observations      string         `json:"observations"`
-	StoreID           uint           `json:"store"`
-	UserID            uint           `json:"user"`
-	TaskTypeID        uint           `json:"task_type"`
-	TimeID            uint           `json:"time"`
-	IntegrationTeamID uint           `json:"integration_team"`
-	CreatedAt         time.Time      `json:"created"`
-	UpdatedAt         time.Time      `json:"updated"`
-	DeletedAt         gorm.DeletedAt `gorm:"index" json:"deleted"`
+	ID                uint            `json:"id" gorm:"primaryKey"`
+	Name              string          `json:"name"`
+	Erp               string          `json:"erp"`
+	Date              time.Time       `json:"date"`
+	Observations      string          `json:"observations"`
+	StoreID           uint            `json:"-"`
+	Store             Store           `json:"store,omitempty" gorm:"foreignKey:StoreID;references:ID"`
+	UserID            uint            `json:"-"`
+	User              User            `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID"`
+	TaskTypeID        uint            `json:"-"`
+	TaskType          TaskType        `json:"task_type,omitempty" gorm:"foreignKey:TaskTypeID;references:ID"`
+	TimeID            uint            `json:"-"`
+	Time              Time            `json:"time,omitempty" gorm:"foreignKey:TimeID;references:ID"`
+	IntegrationTeamID uint            `json:"-"`
+	IntegrationTeam   IntegrationTeam `json:"integration_team,omitempty" gorm:"foreignKey:IntegrationTeamID;references:ID"`
+	CreatedAt         time.Time       `json:"created"`
+	UpdatedAt         time.Time       `json:"updated"`
+	DeletedAt         gorm.DeletedAt  `gorm:"index" json:"deleted"`
 }

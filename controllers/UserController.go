@@ -27,7 +27,11 @@ func GetUsers(c *gin.Context) {
 	db := database.GetDatabase()
 
 	var users []models.User
-	err := db.Find(&users).Error
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage := 2
+
+	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&users).Error
 
 	if err != nil {
 		c.JSON(404, gin.H{

@@ -21,7 +21,11 @@ func GetTaskTypes(c *gin.Context) {
 	db := database.GetDatabase()
 
 	var taskTypes []models.TaskType
-	err := db.Find(&taskTypes).Error
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage := 2
+
+	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&taskTypes).Error
 
 	if err != nil {
 		c.JSON(404, gin.H{

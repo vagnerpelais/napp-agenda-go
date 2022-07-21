@@ -25,7 +25,11 @@ func GetStores(c *gin.Context) {
 	db := database.GetDatabase()
 
 	var stores []models.Store
-	err := db.Find(&stores).Error
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage := 2
+
+	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&stores).Error
 
 	if err != nil {
 		c.JSON(404, gin.H{

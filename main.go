@@ -10,5 +10,6 @@ func main() {
 	config.Load()
 	database.StartDB(config.ConnectionString)
 	s := server.NewServer()
+	
 	s.Run()
 }

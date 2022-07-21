@@ -21,7 +21,11 @@ func GetTimes(c *gin.Context) {
 	db := database.GetDatabase()
 
 	var times []models.Time
-	err := db.Find(&times).Error
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage := 2
+
+	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&times).Error
 
 	if err != nil {
 		c.JSON(404, gin.H{
