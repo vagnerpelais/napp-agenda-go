@@ -1,24 +1,27 @@
 FROM golang:1.18.3-alpine3.16 as builder
 
-COPY ./controllers /go/src/napp-agenda/controllers/
-COPY ./server /go/src/napp-agenda/server/
-COPY ./database /go/src/napp-agenda/database/
-COPY ./config /go/src/napp-agenda/config/
-COPY ./models /go/src/napp-agenda/models/
+COPY ./controllers /go/src/github.com/vagnerpelais/napp-agenda/controllers/
+COPY ./database /go/src/github.com/vagnerpelais/napp-agenda/database/
+COPY ./models /go/src/github.com/vagnerpelais/napp-agenda/models/
+COPY ./config /go/src/github.com/vagnerpelais/napp-agenda/config/
+COPY ./repositories /go/src/github.com/vagnerpelais/napp-agenda/repositories/
+COPY ./services /go/src/github.com/vagnerpelais/napp-agenda/services/
+COPY ./server /go/src/github.com/vagnerpelais/napp-agenda/server/
 
-COPY ../go.mod /go/src/napp-agenda/
-COPY ../main.go /go/src/napp-agenda/
+
+COPY ./go.mod /go/src/github.com/vagnerpelais/napp-agenda/
+COPY ./main.go /go/src/github.com/vagnerpelais/napp-agenda/
 
 
-WORKDIR /go/src/napp-agenda/
+WORKDIR /go/src/github.com/vagnerpelais/napp-agenda
 
 RUN go get
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o build/main .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o build/main github.com/vagnerpelais/napp-agenda
 
 FROM alpine
 RUN apk add --no-cache ca-certificates && update-ca-certificates
-COPY --from=builder /go/src/napp-agenda/build/main /usr/bin/main
+COPY --from=builder /go/src/github.com/vagnerpelais/napp-agenda/build/main /usr/bin/main
 EXPOSE 5050 5050
 
 RUN apk add --update curl && apk add --update tar && apk add --no-cache tzdata && rm -rf /var/cache/apk/*

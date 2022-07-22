@@ -27,8 +27,8 @@ services:
     depends_on:
       - db
     environment:
-      - DBUSER=postgres
-      - DBPASS=root
-      - DBHOST=db
-      - DBPORT=5432
-      - DBNAME=napp_agenda
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=napp_agenda
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
