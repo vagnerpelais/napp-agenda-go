@@ -3,8 +3,10 @@
 Napp Agenda application made using GO lang, gin and gorm.
 
 
-`TO INSTALL DEPENDENCIES`
+`TO INSTALL DEPENDENCIES RUN`
+
 go get
 
-`TO RUN`
+`TO RUN EXECUTE`
+
 go run main.go
