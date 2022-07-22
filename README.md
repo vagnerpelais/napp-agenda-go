@@ -5,8 +5,10 @@ Napp Agenda application made using GO lang, gin and gorm.
 
 `TO INSTALL DEPENDENCIES RUN`
 
-go get
+- go get
 
 `TO RUN EXECUTE`
 
-go run main.go
+- docker-compose up --build -d db 
+
+- go run main.go
