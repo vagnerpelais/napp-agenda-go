@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vagnerpelais/napp-agenda/database"
 	"github.com/vagnerpelais/napp-agenda/models"
+	"github.com/vagnerpelais/napp-agenda/repositories"
 )
 
 type CreateTimeInput struct {
@@ -20,13 +21,11 @@ type UpdateTimeInput struct {
 func GetTimes(c *gin.Context) {
 	db := database.GetDatabase()
 
-	var times []models.Time
-
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage := 2
 
-	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&times).Error
-
+	repository := repositories.NewTimeRepository(db)
+	times, err := repository.GetTimes(perPage, page)
 	if err != nil {
 		c.JSON(404, gin.H{
 			"error": "cannot find all times: " + err.Error(),
@@ -38,11 +37,15 @@ func GetTimes(c *gin.Context) {
 }
 
 func GetTimeByID(c *gin.Context) {
-	var time models.Time
-
 	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
 
-	if err := db.Where("id = ?", c.Param("id")).First(&time).Error; err != nil {
+	repository := repositories.NewTimeRepository(db)
+	time, err := repository.GetTimeByID(id)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -63,18 +66,17 @@ func CreateTime(c *gin.Context) {
 
 	db := database.GetDatabase()
 
-	db.Create(&time)
+	repository := repositories.NewTimeRepository(db)
+	newTime := repository.CreateTime(time)
 
-	c.JSON(http.StatusOK, gin.H{"data": time})
+	c.JSON(http.StatusOK, gin.H{"data": newTime})
 }
 
 func UpdateTime(c *gin.Context) {
-	var time models.Time
 	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&time).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
-		return
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
 	}
 
 	var input UpdateTimeInput
@@ -87,22 +89,29 @@ func UpdateTime(c *gin.Context) {
 		Hour: input.Hour,
 	}
 
-	db.Model(&time).Updates(updateTime)
-
-	c.JSON(http.StatusOK, gin.H{"data": time})
-}
-
-func DeleteTime(c *gin.Context) {
-	var time models.Time
-
-	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&time).Error; err != nil {
+	repository := repositories.NewTimeRepository(db)
+	newTime, err := repository.UpdateTime(id, updateTime)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
 
-	db.Delete(&time)
+	c.JSON(http.StatusOK, gin.H{"data": newTime})
+}
 
-	c.JSON(http.StatusOK, gin.H{"data": true})
+func DeleteTime(c *gin.Context) {
+	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
+
+	repository := repositories.NewTimeRepository(db)
+	time, err := repository.DeleteTime(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": time})
 }

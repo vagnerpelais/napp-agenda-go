@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/tobiwild/holidays"
@@ -33,9 +32,7 @@ func FormatTime(timestr string) (string, time.Time, error) {
 			return "", time.Time{}, err
 		}
 
-		stringFormated := fmt.Sprintf("%d-%d-%d", t.Year(), int(t.Month()), t.Day())
-
-		return stringFormated, t, nil
+		return t.Format(layout), t, nil
 	}
 	return "", time.Time{}, nil
 }

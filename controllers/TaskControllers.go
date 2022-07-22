@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vagnerpelais/napp-agenda/database"
 	"github.com/vagnerpelais/napp-agenda/models"
+	"github.com/vagnerpelais/napp-agenda/repositories"
 	"github.com/vagnerpelais/napp-agenda/services"
 	"gorm.io/gorm"
 )
@@ -74,37 +75,14 @@ type CreateTaskInput struct {
 	IntegrationTeamID ResponseIntegrationTeam `json:"integration_team" binding:"required"`
 }
 
-func getTasksCount(teamid int64, timeid int64, date string) uint {
-	var count uint
-
-	db := database.GetDatabase()
-
-	db.Raw("SELECT COUNT(*) FROM task WHERE integration_team_id = ? and time_id = ? and date = ?", teamid, timeid, date).Scan(&count)
-
-	return count
-}
-
-func getIntegrationTeamLimit(id int64) uint {
-	var limit uint
-
-	db := database.GetDatabase()
-
-	db.Raw("SELECT limit_per_hour from integration_team where id = ?", id).Scan(&limit)
-
-	return limit
-}
-
 func GetTasks(c *gin.Context) {
 	db := database.GetDatabase()
-
-	var task []models.Task
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage := 2
 
-	err := db.Limit(perPage).Offset((page - 1) * perPage).Preload("Store").Preload("User").
-		Preload("TaskType").Preload("Time").Preload("IntegrationTeam").Find(&task).Error
-
+	repository := repositories.NewTaskRepository(db)
+	tasks, err := repository.GetTasks(perPage, page)
 	if err != nil {
 		c.JSON(404, gin.H{
 			"error": "cannot find all task: " + err.Error(),
@@ -112,15 +90,19 @@ func GetTasks(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"total": strconv.Itoa(len(task)), "data": task})
+	c.JSON(200, gin.H{"total": strconv.Itoa(len(tasks)), "data": tasks})
 }
 
 func GetTaskByID(c *gin.Context) {
-	var task models.Task
 	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
 
-	if err := db.Where("id = ?", c.Param("id")).Preload("Store").Preload("User").
-		Preload("TaskType").Preload("Time").Preload("IntegrationTeam").Find(&task).Error; err != nil {
+	repository := repositories.NewTaskRepository(db)
+	task, err := repository.GetTaskByID(id)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -165,33 +147,26 @@ func CreateTask(c *gin.Context) {
 	}
 
 	db := database.GetDatabase()
+	repository := repositories.NewTaskRepository(db)
 
-	// var event []models.Events
-	// var count int64
-	// db.Find(&event, "ilike date = ?", dateFormat).Count(&count)
-
-	// log.Printf("%d", count)
-
-	counter := getTasksCount(int64(input.IntegrationTeamID.ID), int64(input.TimeID.ID), dateString)
-	limit := getIntegrationTeamLimit(int64(input.IntegrationTeamID.ID))
+	counter := repository.GetTasksCount(int64(input.IntegrationTeamID.ID), int64(input.TimeID.ID), dateString)
+	limit := repository.GetIntegrationTeamLimit(0, int64(input.IntegrationTeamID.ID))
 
 	if counter >= limit {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Limit of schedules per hour exceeded!"})
 		return
 	}
 
-	db.Create(&task)
+	newTask := repository.CreateTask(task)
 
-	c.JSON(http.StatusOK, gin.H{"data": task})
+	c.JSON(http.StatusOK, gin.H{"data": newTask})
 }
 
 func UpdateTask(c *gin.Context) {
-	var task models.Task
 	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&task).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
-		return
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
 	}
 
 	var input UpdateTaskInput
@@ -231,22 +206,38 @@ func UpdateTask(c *gin.Context) {
 		IntegrationTeamID: input.IntegrationTeamID,
 	}
 
-	db.Model(&task).Updates(updateTask)
+	repository := repositories.NewTaskRepository(db)
 
-	c.JSON(http.StatusOK, gin.H{"data": task})
-}
+	counter := repository.GetTasksCountUpdate(id, int(input.IntegrationTeamID), int(input.TimeID), dateString)
+	limit := repository.GetIntegrationTeamLimit(int64(id), int64(input.IntegrationTeamID))
 
-func DeleteTask(c *gin.Context) {
-	var task models.Task
+	if counter >= limit {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Limit of schedules per hour exceeded!"})
+		return
+	}
 
-	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&task).Error; err != nil {
+	newTask, err := repository.UpdateTask(id, updateTask)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
 
-	db.Delete(&task)
+	c.JSON(http.StatusOK, gin.H{"data": newTask})
+}
 
-	c.JSON(http.StatusOK, gin.H{"data": true})
+func DeleteTask(c *gin.Context) {
+	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
+
+	repository := repositories.NewTaskRepository(db)
+	task, err := repository.TaskDelete(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": task})
 }

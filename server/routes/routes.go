@@ -44,7 +44,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 			api.GET("/tasks/:id", controllers.GetTaskByID)
 			api.POST("/tasks", controllers.CreateTask)
 			api.PATCH("/tasks/:id", controllers.UpdateTask)
-			api.DELETE("/tasks/:id", controllers.DeleteTaskType)
+			api.DELETE("/tasks/:id", controllers.DeleteTask)
 
 			api.GET("/events", controllers.GetEvents)
 			api.GET("/events/:id", controllers.GetEventByID)

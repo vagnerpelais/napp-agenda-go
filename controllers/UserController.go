@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vagnerpelais/napp-agenda/database"
 	"github.com/vagnerpelais/napp-agenda/models"
+	"github.com/vagnerpelais/napp-agenda/repositories"
 )
 
 type CreateUserInput struct {
@@ -26,13 +27,11 @@ type UpdateUserInput struct {
 func GetUsers(c *gin.Context) {
 	db := database.GetDatabase()
 
-	var users []models.User
-
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage := 2
 
-	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&users).Error
-
+	repository := repositories.NewUserRepository(db)
+	users, err := repository.GetUsers(perPage, page)
 	if err != nil {
 		c.JSON(404, gin.H{
 			"error": "cannot find all users: " + err.Error(),
@@ -44,11 +43,15 @@ func GetUsers(c *gin.Context) {
 }
 
 func GetUserByID(c *gin.Context) {
-	var user models.User
-
 	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
 
-	if err := db.Where("id = ?", c.Param("id")).First(&user).Error; err != nil {
+	repository := repositories.NewUserRepository(db)
+	user, err := repository.GetUserByID(id)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -72,18 +75,17 @@ func CreateUser(c *gin.Context) {
 
 	db := database.GetDatabase()
 
-	db.Create(&user)
+	repository := repositories.NewUserRepository(db)
+	newUser := repository.CreateUser(user)
 
-	c.JSON(http.StatusOK, gin.H{"data": user})
+	c.JSON(http.StatusOK, gin.H{"data": newUser})
 }
 
 func UpdateUser(c *gin.Context) {
-	var user models.User
 	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&user).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
-		return
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
 	}
 
 	var input UpdateUserInput
@@ -99,22 +101,29 @@ func UpdateUser(c *gin.Context) {
 		IsTechLead: input.IsTechLead,
 	}
 
-	db.Model(&user).Updates(updateUser)
-
-	c.JSON(http.StatusOK, gin.H{"data": user})
-}
-
-func DeleteUser(c *gin.Context) {
-	var user models.User
-
-	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&user).Error; err != nil {
+	repository := repositories.NewUserRepository(db)
+	newUser, err := repository.UpdateUser(id, updateUser)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
 
-	db.Delete(&user)
+	c.JSON(http.StatusOK, gin.H{"data": newUser})
+}
 
-	c.JSON(http.StatusOK, gin.H{"data": true})
+func DeleteUser(c *gin.Context) {
+	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
+
+	repository := repositories.NewUserRepository(db)
+	user, err := repository.DeleteUser(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": user})
 }

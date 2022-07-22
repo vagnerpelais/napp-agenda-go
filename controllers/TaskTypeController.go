@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vagnerpelais/napp-agenda/database"
 	"github.com/vagnerpelais/napp-agenda/models"
+	"github.com/vagnerpelais/napp-agenda/repositories"
 )
 
 type CreateTaskTypeInput struct {
@@ -20,13 +21,11 @@ type UpdateTaskTypeInput struct {
 func GetTaskTypes(c *gin.Context) {
 	db := database.GetDatabase()
 
-	var taskTypes []models.TaskType
-
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage := 2
 
-	err := db.Limit(perPage).Offset((page - 1) * perPage).Find(&taskTypes).Error
-
+	repository := repositories.NewTaskTypeRepository(db)
+	taskTypes, err := repository.GetTaskTypes(perPage, page)
 	if err != nil {
 		c.JSON(404, gin.H{
 			"error": "cannot find all task types: " + err.Error(),
@@ -38,11 +37,15 @@ func GetTaskTypes(c *gin.Context) {
 }
 
 func GetTaskTypeByID(c *gin.Context) {
-	var taskType models.TaskType
-
 	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
 
-	if err := db.Where("id = ?", c.Param("id")).First(&taskType).Error; err != nil {
+	repository := repositories.NewTaskTypeRepository(db)
+	taskType, err := repository.GetTaskTypeByID(id)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -63,18 +66,17 @@ func CreateTaskType(c *gin.Context) {
 
 	db := database.GetDatabase()
 
-	db.Create(&taskType)
+	repository := repositories.NewTaskTypeRepository(db)
+	newTaskType := repository.CreateTaskType(taskType)
 
-	c.JSON(http.StatusOK, gin.H{"data": taskType})
+	c.JSON(http.StatusOK, gin.H{"data": newTaskType})
 }
 
 func UpdateTaskType(c *gin.Context) {
-	var taskType models.TaskType
 	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&taskType).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
-		return
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
 	}
 
 	var input UpdateTaskTypeInput
@@ -87,22 +89,29 @@ func UpdateTaskType(c *gin.Context) {
 		Name: input.Name,
 	}
 
-	db.Model(&taskType).Updates(updateTaskType)
-
-	c.JSON(http.StatusOK, gin.H{"data": taskType})
-}
-
-func DeleteTaskType(c *gin.Context) {
-	var taskType models.TaskType
-
-	db := database.GetDatabase()
-
-	if err := db.Where("id = ?", c.Param("id")).First(&taskType).Error; err != nil {
+	repository := repositories.NewTaskTypeRepository(db)
+	newTaskType, err := repository.UpdateTaskType(id, updateTaskType)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
 
-	db.Delete(&taskType)
+	c.JSON(http.StatusOK, gin.H{"data": newTaskType})
+}
 
-	c.JSON(http.StatusOK, gin.H{"data": true})
+func DeleteTaskType(c *gin.Context) {
+	db := database.GetDatabase()
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param malformated!"})
+	}
+
+	repository := repositories.NewTaskTypeRepository(db)
+	taskType, err := repository.DeleteTaskType(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": taskType})
 }
