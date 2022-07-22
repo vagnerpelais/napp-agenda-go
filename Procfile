@@ -1,1 +1,0 @@
-web: napp-go-backend
