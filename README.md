@@ -12,3 +12,5 @@ Napp Agenda application made using GO lang, gin and gorm.
 - docker-compose up --build -d db 
 
 - go run main.go
+
+
